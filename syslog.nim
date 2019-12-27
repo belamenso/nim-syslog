@@ -121,6 +121,8 @@ var moduleIdent = appName().stringToIdentArray()  # APP-NAME
 var moduleFacility = defaultFacility
 # Syslog socket
 var sock: SocketHandle = SocketHandle(-1)
+# Attempts to log an event with severity level not in this mask will be ignored
+var logMask = { logEmerg, logAlert, logCrit, logErr, logWarning, logNotice, logInfo, logDebug }
 
 # Locking procedures (lock is acquired only if "--threads:on" is enabled)
 proc acquireSyslogLock() =
@@ -176,6 +178,7 @@ proc emitLog(severity: SyslogSeverity, msg: string) =
     timeStamp: string
     logMsg: string
     hostIdent: string
+  if severity notin logMask: return
   acquireSyslogLock()
   defer: releaseSyslogLock()
   pri = calculate_priority(moduleFacility, severity)
@@ -197,6 +200,13 @@ proc closelog*() {.raises: [], gcsafe.} =
   acquireSyslogLock()
   defer: releaseSyslogLock()
   closeLogInternal()
+
+proc setlogmask*(mask: set[SyslogSeverity]): set[SyslogSeverity] {.raises: [], gcsafe.} =
+  result = logMask
+  logMask = mask
+
+proc getlogmask*(): set[SyslogSeverity] =
+  logMask
 
 proc emerg*(msg: string) {.raises: [], gcsafe.} =
   emitLog(logEmerg, msg)
